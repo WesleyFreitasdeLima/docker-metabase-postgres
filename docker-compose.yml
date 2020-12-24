@@ -1,4 +1,4 @@
-version: "3"
+version: "2.2"
 
 #######################################################################################
 # Cria/Define a rede interna de comunicação entre o Postgres e a aplicação do Metabase
