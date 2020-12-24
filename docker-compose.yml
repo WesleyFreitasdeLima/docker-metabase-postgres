@@ -1,0 +1,111 @@
+version: "3"
+
+#######################################################################################
+# Cria/Define a rede interna de comunicação entre o Postgres e a aplicação do Metabase
+#######################################################################################
+networks:
+  network-metabase:
+      name: "network-metabase"
+      driver: bridge
+      ipam: {
+        config: [
+          subnet: "192.168.50.0/29"
+        ]
+      }
+
+#######################################################################################
+# Cria os serviços necessários para utilizar o Metabase
+#######################################################################################
+services:
+
+  #######################################################################################
+  # Cria o banco de dados Postgres da aplicação do Metabase
+  #######################################################################################
+  metabase-database:
+    # Configurações gerais
+    container_name: "metabase-database"
+    image: postgres:13.1
+    restart: on-failure
+
+    # Volumes persistentes mapeados
+    volumes: 
+      - volume-metabase-database:/var/lib/postgresql/data
+
+    # Portas mapeadas
+    ports:
+      - 5432:5432
+
+    # Variaveis de ambiente
+    environment:
+      POSTGRES_DB: metabase
+      POSTGRES_USER: metabaseDbUsuario
+      POSTGRES_PASSWORD: metabaseDbSenha
+      PGDATA: /var/lib/postgresql/data/pgdata
+      PGPORT: 5432
+
+    # Configurações de rede local
+    networks: 
+      network-metabase:
+        aliases: 
+          - metabase-database
+
+
+  #######################################################################################
+  # Cria o container da aplicação do Metabase
+  #######################################################################################
+  metabase-app:
+    # Configurações gerais    
+    container_name: "metabase-app"
+
+    # Cria imagem base usando o Dockerfile, adicionando plugins na imagem original do Metabase
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Configurações gerais
+    image: local/metabase-app:20201224
+    restart: on-failure
+
+    # Volumes persistentes mapeados
+    volumes: 
+      - volume-metabase-app:/metabase/metabase-data:rw
+      - volume-metabase-app-plugins:/metabase/plugins:rw
+
+    # Portas mapeadas
+    ports:
+      - 3000:3000
+
+    # Variaveis de ambiente
+    environment:
+      JAVA_TIMEZONE: "America/Sao_Paulo"
+      JAVA_TOOL_OPTIONS: "-Xmx2g" # Remova essa linha para o JVM descobrir automaticamente quando de mem RAM disponivel
+      MB_SITE_LOCALE: "pt"
+      MB_DB_TYPE: postgres        
+      MB_DB_HOST: metabase-database
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabaseDbUsuario
+      MB_DB_PASS: metabaseDbSenha
+      MB_PLUGINS_DIR: /metabase/plugins ## Diretorio persistente de plugins
+
+    # Configurações de rede local
+    networks: 
+      network-metabase:
+        aliases: 
+          - metabase-app
+
+#######################################################################################
+# Define o volume persistente no servidor
+# OBS: É necessário criar os volumes ANTES de executar o docker-compose
+# sudo docker volume create --name=volume-metabase-database
+# sudo docker volume create --name=volume-metabase-app
+# sudo docker volume create --name=volume-metabase-app-plugins
+#######################################################################################
+volumes: 
+  volume-metabase-database:
+    external: true
+  volume-metabase-app:
+    external: true  
+  volume-metabase-app-plugins:
+    external: true  
+
